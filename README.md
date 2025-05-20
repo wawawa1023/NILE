@@ -22,15 +22,7 @@
 
 ---
 
-## 📂 Project Structure
 
-nile/
-├── main.py # Entry point (CLI interface)
-├── llm_interface.py # BERT-based Japanese language understanding
-├── symbolic_engine.py # Handles symbolic logic/inference
-├── knowledge_base.py # Manages knowledge as JSON/dict
-├── knowledge.json # Stores current knowledge
-└── README.md # Project documentation
 
 ## ⚙️ Requirements
 
