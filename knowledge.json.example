@@ -1,0 +1,39 @@
+{
+  "facts": [
+    {
+      "subject": "猫",
+      "relation": "種類",
+      "object": "哺乳類"
+    },
+    {
+      "subject": "哺乳類",
+      "relation": "種類",
+      "object": "動物"
+    },
+    {
+      "subject": "犬",
+      "relation": "種類",
+      "object": "哺乳類"
+    },
+    {
+      "subject": "鳥",
+      "relation": "種類",
+      "object": "動物"
+    },
+    {
+      "subject": "猫",
+      "relation": "属性",
+      "object": "かわいい"
+    },
+    {
+      "subject": "犬",
+      "relation": "属性",
+      "object": "忠実"
+    },
+    {
+      "subject": "鳥",
+      "relation": "属性",
+      "object": "自由"
+    }
+  ]
+} 
