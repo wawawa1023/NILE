@@ -13,6 +13,7 @@ class SymbolicEngine:
     def __init__(self, knowledge_file: str = "knowledge.json"):
         self.max_workers = multiprocessing.cpu_count()
         self._init_locks()
+        self._init_thread_pool()
         self._init_time_expressions()
         self._init_attribute_adjectives()
         self.knowledge_base = KnowledgeBase(knowledge_file)
@@ -102,24 +103,36 @@ class SymbolicEngine:
         self.relation_index = defaultdict(set) # 関係から事実を検索
         self._rebuild_indices()
 
+    def _init_thread_pool(self):
+        """スレッドプールの初期化"""
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers,
+            thread_name_prefix="SymbolicEngine"
+        )
+
     def _rebuild_indices(self):
-        """インデックスを並列で再構築"""
+        """インデックスを並列で再構築（最適化版）"""
         self.subject_index.clear()
         self.object_index.clear()
         self.relation_index.clear()
 
         facts = self.knowledge_base.get_facts()
+        futures = []
         
         # 並列処理でインデックスを構築
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = []
-            for fact in facts:
-                if isinstance(fact, dict) and all(k in fact for k in ["subject", "relation", "object"]):
-                    futures.append(executor.submit(self._update_indices, 
-                        fact["subject"], fact["object"], fact["relation"]))
+        for fact in facts:
+            if isinstance(fact, dict) and all(k in fact for k in ["subject", "relation", "object"]):
+                futures.append(
+                    self.thread_pool.submit(
+                        self._update_indices,
+                        fact["subject"],
+                        fact["object"],
+                        fact["relation"]
+                    )
+                )
 
-            # 全ての処理が完了するのを待つ
-            concurrent.futures.wait(futures)
+        # 全ての処理が完了するのを待つ
+        concurrent.futures.wait(futures)
 
     def _update_indices(self, subject: str, object_: str, relation: str):
         """インデックスを更新（スレッドセーフ）"""
@@ -129,52 +142,47 @@ class SymbolicEngine:
             self.relation_index[relation].add((subject, object_))
 
     def _find_related_nodes(self, node: str) -> Set[str]:
-        """ノードに関連する全てのノードを並列で取得"""
-        related = set()
+        """ノードに関連する全てのノードを並列で取得（最適化版）"""
+        futures = []
         
-        def process_subject_relations():
-            return {obj for obj, _ in self.subject_index[node]}
-            
-        def process_object_relations():
-            return {subj for subj, _ in self.object_index[node]}
-
-        # 並列で主語と目的語の関係を処理
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            subject_future = executor.submit(process_subject_relations)
-            object_future = executor.submit(process_object_relations)
-            
-            related.update(subject_future.result())
-            related.update(object_future.result())
+        # 主語と目的語の関係を並列で処理
+        futures.append(self.thread_pool.submit(
+            lambda: {obj for obj, _ in self.subject_index[node]}
+        ))
+        futures.append(self.thread_pool.submit(
+            lambda: {subj for subj, _ in self.object_index[node]}
+        ))
+        
+        # 結果を待機して結合
+        related = set()
+        for future in concurrent.futures.as_completed(futures):
+            related.update(future.result())
             
         return related
 
     def _find_relation_between(self, subject: str, object_: str) -> Optional[str]:
-        """2つのノード間の関係を並列で検索"""
-        def check_subject_relations():
-            for obj, relation in self.subject_index[subject]:
-                if obj == object_:
-                    return relation
-            return None
-
-        def check_object_relations():
-            for subj, relation in self.object_index[object_]:
-                if subj == subject:
-                    return RelationUtils.get_reverse_relation(relation)
-            return None
-
-        # 並列で関係を検索
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            subject_future = executor.submit(check_subject_relations)
-            object_future = executor.submit(check_object_relations)
-            
-            subject_relation = subject_future.result()
-            if subject_relation:
-                return subject_relation
+        """2つのノード間の関係を並列で検索（最適化版）"""
+        futures = []
+        
+        # 主語と目的語の関係を並列で検索
+        futures.append(self.thread_pool.submit(
+            lambda: next((rel for obj, rel in self.subject_index[subject] if obj == object_), None)
+        ))
+        futures.append(self.thread_pool.submit(
+            lambda: next((RelationUtils.get_reverse_relation(rel) 
+                         for subj, rel in self.object_index[object_] if subj == subject), None)
+        ))
+        
+        # 最初に見つかった有効な関係を返す
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                return result
                 
-            return object_future.result()
+        return None
 
     def _find_indirect_path(self, start: str, end: str, max_depth: int = 3) -> Optional[List[str]]:
-        """間接的な関係のパスを並列で探索"""
+        """間接的な関係のパスを並列で探索（最適化版）"""
         def process_path(current: str, target: str, path: List[str], depth: int) -> Optional[List[str]]:
             if depth > max_depth:
                 return None
@@ -183,20 +191,22 @@ class SymbolicEngine:
 
             # 関連するノードを並列で処理
             related_nodes = self._find_related_nodes(current)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = []
-                for next_node in related_nodes:
-                    if next_node not in path:
-                        new_path = path + [next_node]
-                        futures.append(
-                            executor.submit(process_path, next_node, target, new_path, depth + 1)
+            futures = []
+            
+            for next_node in related_nodes:
+                if next_node not in path:
+                    new_path = path + [next_node]
+                    futures.append(
+                        self.thread_pool.submit(
+                            process_path, next_node, target, new_path, depth + 1
                         )
+                    )
 
-                # 最初に見つかった有効なパスを返す
-                for future in concurrent.futures.as_completed(futures):
-                    result = future.result()
-                    if result:
-                        return result
+            # 最初に見つかった有効なパスを返す
+            for future in concurrent.futures.as_completed(futures):
+                result = future.result()
+                if result:
+                    return result
 
             return None
 
@@ -225,18 +235,32 @@ class SymbolicEngine:
         if subject not in self.time_expressions:
             return None
 
-        target_date = datetime.now() + timedelta(days=self.time_expressions[subject])
-        target_date_str = target_date.strftime("%Y-%m-%d")
-
-        facts = self.knowledge_base.get_facts_by_date(target_date_str)
+        # 時間表現に関連する事実を取得
+        facts = self.knowledge_base.get_facts_by_time_expression(subject)
         if not facts:
             return f"{subject}の{object_}については分かりません。"
 
+        # 直接の関係を確認
         for fact in facts:
             if fact["object"] == object_:
-                return f"はい、{subject}は{object_}です。"
+                return f"はい、{subject}は{fact['relation']} {object_}です。"
             elif fact["subject"] == object_:
-                return f"はい、{object_}は{subject}です。"
+                return f"はい、{object_}は{fact['relation']} {subject}です。"
+
+        # 間接的な関係を探索
+        for fact in facts:
+            if fact["subject"] == subject:
+                # 目的語から間接的な関係を探索
+                indirect_path = self._find_indirect_path(fact["object"], object_)
+                if indirect_path:
+                    response = [f"はい、{subject}は{fact['relation']} {fact['object']}で、"]
+                    for i in range(len(indirect_path) - 1):
+                        current = indirect_path[i]
+                        next_node = indirect_path[i + 1]
+                        relation = self._find_relation_between(current, next_node)
+                        if relation:
+                            response.append(f"{current}は{relation} {next_node}です。")
+                    return "".join(response)
 
         return f"{subject}の{object_}については分かりません。"
 
@@ -433,24 +457,30 @@ class SymbolicEngine:
         return "\n".join(result)
 
     def process_input(self, text: str) -> str:
-        """入力を処理"""
-        print(f"\n=== process_input開始: {text} ===")  # デバッグ用
+        """入力を処理（最適化版）"""
         try:
             text = text.strip()
             if not text:
-                print("入力が空です")  # デバッグ用
                 return "入力が空です。"
 
-            print(f"コマンド判定: {text}")  # デバッグ用
-            if self._is_list_command(text):
-                print("リストコマンドを検出")  # デバッグ用
+            # 入力タイプの判定を並列で実行
+            futures = []
+            futures.append(self.thread_pool.submit(self._is_list_command, text))
+            futures.append(self.thread_pool.submit(self._is_question, text))
+            
+            is_list, is_question = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+            if is_list:
                 return self.show_knowledge()
-            elif self._is_question(text):
-                print("質問を検出")  # デバッグ用
+            elif is_question:
                 return self._handle_question(text)
             else:
-                print("事実を検出")  # デバッグ用
                 return self._handle_fact(text)
         except Exception as e:
-            print(f"process_inputでエラーが発生しました: {e}")  # デバッグ用
+            print(f"処理中にエラーが発生しました: {e}")
             return "処理中にエラーが発生しました。"
+
+    def __del__(self):
+        """スレッドプールのクリーンアップ"""
+        if hasattr(self, 'thread_pool'):
+            self.thread_pool.shutdown(wait=True)
