@@ -169,3 +169,35 @@ class KnowledgeBase:
             return None
         
         return _find_reverse_path(end, start, set())
+
+    def get_facts_by_date(self, date_str: str) -> List[Dict[str, str]]:
+        """指定された日付に関連する事実を取得
+        
+        Args:
+            date_str: 日付文字列（YYYY-MM-DD形式）
+            
+        Returns:
+            該当する事実のリスト
+        """
+        date_facts = []
+        for fact in self.facts:
+            # 時間表現を含む事実を検索
+            if any(time_expr in fact["subject"] for time_expr in ["今日", "昨日", "明日", "明後日", "一昨日"]):
+                date_facts.append(fact)
+            elif any(time_expr in fact["object"] for time_expr in ["今日", "昨日", "明日", "明後日", "一昨日"]):
+                date_facts.append(fact)
+        return date_facts
+
+    def get_facts_by_time_expression(self, time_expr: str) -> List[Dict[str, str]]:
+        """時間表現に関連する事実を取得
+        
+        Args:
+            time_expr: 時間表現（"今日", "昨日"など）
+            
+        Returns:
+            該当する事実のリスト
+        """
+        return [
+            fact for fact in self.facts
+            if time_expr in fact["subject"] or time_expr in fact["object"]
+        ]
