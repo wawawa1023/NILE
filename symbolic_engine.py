@@ -358,8 +358,10 @@ class SymbolicEngine:
                         
                         # 文脈に基づく関係性の推測
                         if any(phrase in object_ for phrase in ["の一種", "に属する", "の仲間", "の一種です", "に属します"]):
-                            relation = "種類"
-                            print("関係性: 種類")  # デバッグ用
+                            # 関係性を「の一種」として保持し、object_から「の一種」を除去
+                            relation = "の一種"
+                            object_ = object_.replace("の一種", "").replace("の一種です", "").replace("に属します", "").strip()
+                            print("関係性: の一種")  # デバッグ用
                         elif any(phrase in object_ for phrase in ["の特徴", "の性質", "の状態", "の特徴です", "の性質です"]):
                             relation = "属性"
                             print("関係性: 属性")  # デバッグ用
@@ -425,7 +427,10 @@ class SymbolicEngine:
                         # 知識ベースに追加
                         if self.knowledge_base.add_fact(subject, object_, relation):
                             self._update_indices(subject, object_, relation)
-                            response = f"了解しました。{subject}は{relation} {object_}として記録しました。"
+                            if relation == "の一種":
+                                response = f"了解しました。{subject}は{object_}の一種として記録しました。"
+                            else:
+                                response = f"了解しました。{subject}は{relation} {object_}として記録しました。"
                             if is_negative:
                                 response = f"了解しました。{subject}は{relation} {object_}ではないとして記録しました。"
                             print(f"応答: {response}")  # デバッグ用
