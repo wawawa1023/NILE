@@ -243,9 +243,9 @@ class SymbolicEngine:
         # 直接の関係を確認
         for fact in facts:
             if fact["object"] == object_:
-                return f"はい、{subject}は{fact['relation']} {object_}です。"
+                return f"はい、{subject}と{object_}の関係が存在します。"
             elif fact["subject"] == object_:
-                return f"はい、{object_}は{fact['relation']} {subject}です。"
+                return f"はい、{object_}と{subject}の関係が存在します。"
 
         # 間接的な関係を探索
         for fact in facts:
@@ -253,14 +253,14 @@ class SymbolicEngine:
                 # 目的語から間接的な関係を探索
                 indirect_path = self._find_indirect_path(fact["object"], object_)
                 if indirect_path:
-                    response = [f"はい、{subject}は{fact['relation']} {fact['object']}で、"]
+                    response = [f"はい、{subject}と{object_}の間接的な関係が存在します："]
                     for i in range(len(indirect_path) - 1):
                         current = indirect_path[i]
                         next_node = indirect_path[i + 1]
                         relation = self._find_relation_between(current, next_node)
                         if relation:
-                            response.append(f"{current}は{relation} {next_node}です。")
-                    return "".join(response)
+                            response.append(f"- {current}と{next_node}の関係が存在します。")
+                    return "\n".join(response)
 
         return f"{subject}の{object_}については分かりません。"
 
@@ -286,7 +286,7 @@ class SymbolicEngine:
             relation = self._find_relation_between(subject, object_)
             if relation:
                 print(f"直接の関係を発見: {relation}")  # デバッグ用
-                return f"はい、{subject}は{relation} {object_}です。"
+                return f"はい、{subject}と{object_}の関係が存在します。"
 
             # 間接的な関係を探索
             indirect_path = self._find_indirect_path(subject, object_)
@@ -298,7 +298,7 @@ class SymbolicEngine:
                     next_node = indirect_path[i + 1]
                     relation = self._find_relation_between(current, next_node)
                     if relation:
-                        response.append(f"- {current}は{relation} {next_node}です。")
+                        response.append(f"- {current}と{next_node}の関係が存在します。")
                 return "\n".join(response)
 
             print(f"関係が見つかりません: {subject}と{object_}")  # デバッグ用
@@ -430,9 +430,9 @@ class SymbolicEngine:
                             if relation == "の一種":
                                 response = f"了解しました。{subject}は{object_}の一種として記録しました。"
                             else:
-                                response = f"了解しました。{subject}は{relation} {object_}として記録しました。"
+                                response = f"了解しました。{subject}と{object_}の関係を記録しました。"
                             if is_negative:
-                                response = f"了解しました。{subject}は{relation} {object_}ではないとして記録しました。"
+                                response = f"了解しました。{subject}と{object_}の関係を否定として記録しました。"
                             print(f"応答: {response}")  # デバッグ用
                             return response
                         else:
