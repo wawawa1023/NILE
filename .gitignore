@@ -1,3 +1,42 @@
-knowledge.json
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.class
 
-__pycache__
+# Virtual environments
+.venv/
+venv/
+.env/
+.envrc
+
+# Distribution / packaging
+.Python
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Data / artifacts
+knowledge.json
+*.db
+*.sqlite
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Streamlit
+.streamlit/
+
+# Local config
+config.json
