@@ -1,0 +1,47 @@
+{
+  "model": {
+    "name": "cl-tohoku/bert-base-japanese-v3",
+    "type": "bert",
+    "max_length": 512,
+    "batch_size": 16,
+    "use_gpu": true,
+    "cache_dir": "./cache"
+  },
+  "database": {
+    "type": "sqlite",
+    "path": "nile.db",
+    "host": "localhost",
+    "port": 5432,
+    "username": "",
+    "password": "",
+    "database": "nile"
+  },
+  "cache": {
+    "enabled": true,
+    "max_size": 1000,
+    "ttl": 3600,
+    "backend": "memory",
+    "redis_url": "redis://localhost:6379"
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_path": "nile.log",
+    "max_file_size": 10485760,
+    "backup_count": 5
+  },
+  "api": {
+    "host": "localhost",
+    "port": 8000,
+    "debug": false,
+    "cors_enabled": true,
+    "rate_limit": 100
+  },
+  "ui": {
+    "theme": "light",
+    "language": "ja",
+    "auto_save": true,
+    "show_confidence": true,
+    "max_history": 100
+  }
+}
